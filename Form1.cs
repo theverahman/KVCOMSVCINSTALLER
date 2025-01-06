@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Security.Principal;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
@@ -14,6 +15,13 @@ namespace KVCOMSVCINSTALLER
 
         private void Form1_Load(object sender, EventArgs e)
         {
+            if (!IsAdministrator())
+            {
+                MessageBox.Show("This application needs to be run as an administrator. Please restart the application with elevated permissions.", "Administrator Privileges Required", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                Application.Exit();
+                return;
+            }
+
             CheckIfInstalled();
         }
 
@@ -109,18 +117,31 @@ namespace KVCOMSVCINSTALLER
                 {
                     MessageBox.Show("KVCOMSVC is already set to run at startup.", "Already Installed", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     button1.Enabled = false; // Disable the install button
+                    button1.Visible = false; // Hide the install button
                     button4.Enabled = true; // Enable the uninstall button
+                    button4.Visible = true; // Show the uninstall button
                 }
                 else
                 {
                     MessageBox.Show("KVCOMSVC is not set to run at startup.", "Not Installed", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     button1.Enabled = true; // Enable the install button
+                    button1.Visible = true; // Show the install button
                     button4.Enabled = false; // Disable the uninstall button
+                    button4.Visible = false; // Hide the uninstall button
                 }
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Failed to check if KVCOMSVC is installed: {ex.Message}", "Check Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private bool IsAdministrator()
+        {
+            using (WindowsIdentity identity = WindowsIdentity.GetCurrent())
+            {
+                WindowsPrincipal principal = new WindowsPrincipal(identity);
+                return principal.IsInRole(WindowsBuiltInRole.Administrator);
             }
         }
     }
