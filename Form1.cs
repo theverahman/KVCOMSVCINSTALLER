@@ -17,8 +17,7 @@ namespace KVCOMSVCINSTALLER
         {
             if (!IsAdministrator())
             {
-                MessageBox.Show("This application needs to be run as an administrator. Please restart the application with elevated permissions.", "Administrator Privileges Required", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                Application.Exit();
+                PromptForAdminRights();
                 return;
             }
 
@@ -142,6 +141,29 @@ namespace KVCOMSVCINSTALLER
             {
                 WindowsPrincipal principal = new WindowsPrincipal(identity);
                 return principal.IsInRole(WindowsBuiltInRole.Administrator);
+            }
+        }
+
+        private void PromptForAdminRights()
+        {
+            try
+            {
+                ProcessStartInfo startInfo = new ProcessStartInfo
+                {
+                    UseShellExecute = true,
+                    WorkingDirectory = Environment.CurrentDirectory,
+                    FileName = Application.ExecutablePath,
+                    Verb = "runas"
+                };
+                Process.Start(startInfo);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to restart with administrative privileges: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                Application.Exit();
             }
         }
     }
