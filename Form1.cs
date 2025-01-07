@@ -22,11 +22,16 @@ namespace KVCOMSVCINSTALLER
             }
 
             CheckIfInstalled();
+            LoadSettings();
         }
 
         private void button1_Click(object sender, EventArgs e)
         {
+            LoadSettings();
+
             string exePath = textBox1.Text;
+            string textBox2Value = textBox2.Text;
+            string textBox3Value = textBox3.Text;
 
             if (string.IsNullOrEmpty(exePath))
             {
@@ -37,6 +42,18 @@ namespace KVCOMSVCINSTALLER
             if (!Path.IsPathRooted(exePath) || !File.Exists(exePath))
             {
                 MessageBox.Show("Please enter a valid path to KVCOMSVC.exe", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (string.IsNullOrEmpty(textBox2Value))
+            {
+                MessageBox.Show("Please set a value for textBox2", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (string.IsNullOrEmpty(textBox3Value))
+            {
+                MessageBox.Show("Please set a value for textBox3", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
@@ -51,6 +68,7 @@ namespace KVCOMSVCINSTALLER
         private void button3_Click(object sender, EventArgs e)
         {
             BrowseExefile();
+            LoadSettings();
         }
 
         private void button4_Click(object sender, EventArgs e)
@@ -58,12 +76,29 @@ namespace KVCOMSVCINSTALLER
             UninstallExecute();
         }
 
+        private void button5_Click(object sender, EventArgs e)
+        {
+            WriteToSettingsFileLine1(textBox2.Text);
+        }
+
+        private void button6_Click(object sender, EventArgs e)
+        {
+            WriteToSettingsFileLine2(textBox3.Text);
+        }
+
         private void InstallExecute(string exePath)
         {
             try
             {
-                RegistryKey registryKey = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
-                registryKey.SetValue("KVCOMSVC", exePath);
+                string startupFolderPath = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
+                string shortcutPath = Path.Combine(startupFolderPath, "KVCOMSVC.lnk");
+
+                WshShell shell = new WshShell();
+                IWshShortcut shortcut = (IWshShortcut)shell.CreateShortcut(shortcutPath);
+                shortcut.Description = "KVCOMSVC";
+                shortcut.TargetPath = exePath;
+                shortcut.Save();
+
                 MessageBox.Show("KVCOMSVC has been added to startup.", "Installation Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
@@ -80,9 +115,18 @@ namespace KVCOMSVCINSTALLER
         {
             try
             {
-                RegistryKey registryKey = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
-                registryKey.DeleteValue("KVCOMSVC", false);
-                MessageBox.Show("KVCOMSVC has been removed from startup.", "Uninstallation Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                string startupFolderPath = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
+                string shortcutPath = Path.Combine(startupFolderPath, "KVCOMSVC.lnk");
+
+                if (File.Exists(shortcutPath))
+                {
+                    File.Delete(shortcutPath);
+                    MessageBox.Show("KVCOMSVC has been removed from startup.", "Uninstallation Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else
+                {
+                    MessageBox.Show("KVCOMSVC shortcut not found in startup folder.", "Uninstallation Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
             catch (Exception ex)
             {
@@ -111,9 +155,12 @@ namespace KVCOMSVCINSTALLER
         {
             try
             {
-                RegistryKey registryKey = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
-                if (registryKey.GetValue("KVCOMSVC") != null)
+                string startupFolderPath = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
+                string shortcutPath = Path.Combine(startupFolderPath, "KVCOMSVC.lnk");
+
+                if (File.Exists(shortcutPath))
                 {
+                    textBox1.Text = ((IWshShortcut)new WshShell().CreateShortcut(shortcutPath)).TargetPath;
                     MessageBox.Show("KVCOMSVC is already set to run at startup.", "Already Installed", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     button1.Enabled = false; // Disable the install button
                     button1.Visible = false; // Hide the install button
@@ -132,6 +179,125 @@ namespace KVCOMSVCINSTALLER
             catch (Exception ex)
             {
                 MessageBox.Show($"Failed to check if KVCOMSVC is installed: {ex.Message}", "Check Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void LoadSettings()
+        {
+            try
+            {
+                string exePath = textBox1.Text;
+                if (string.IsNullOrEmpty(exePath) || !File.Exists(exePath))
+                {
+                    MessageBox.Show("Please select the KVCOMSVC executable first.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                string directory = Path.GetDirectoryName(exePath);
+                string settingsFilePath = Path.Combine(directory, "KVCOMSVC_SETTING");
+
+                if (File.Exists(settingsFilePath))
+                {
+                    string[] settings = File.ReadAllLines(settingsFilePath);
+                    textBox2.Text = settings[0];
+                    if (settings.Length > 1 && settings[1].StartsWith("/checkinterval:"))
+                    {
+                        textBox3.Text = settings[1].Substring("/checkinterval:".Length);
+                    }
+                    else
+                    {
+                        textBox3.Text = string.Empty;
+                    }
+                    MessageBox.Show("Settings loaded successfully.", "Settings Loaded", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else
+                {
+                    MessageBox.Show("KVCOMSVC_SETTING file not found.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to load settings: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void WriteToSettingsFileLine1(string newValue)
+        {
+            try
+            {
+                string exePath = textBox1.Text;
+                if (string.IsNullOrEmpty(exePath) || !File.Exists(exePath))
+                {
+                    MessageBox.Show("Please select the KVCOMSVC executable first.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                string directory = Path.GetDirectoryName(exePath);
+                string settingsFilePath = Path.Combine(directory, "KVCOMSVC_SETTING");
+
+                if (File.Exists(settingsFilePath))
+                {
+                    string[] settings = File.ReadAllLines(settingsFilePath);
+                    if (settings.Length > 0)
+                    {
+                        settings[0] = newValue; // Update the first line
+                    }
+                    else
+                    {
+                        Array.Resize(ref settings, 1);
+                        settings[0] = newValue;
+                    }
+                    File.WriteAllLines(settingsFilePath, settings);
+                    MessageBox.Show("Settings updated successfully.", "Settings Updated", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else
+                {
+                    MessageBox.Show("KVCOMSVC_SETTING file not found.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to update settings: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void WriteToSettingsFileLine2(string newValue)
+        {
+            try
+            {
+                string exePath = textBox1.Text;
+                if (string.IsNullOrEmpty(exePath) || !File.Exists(exePath))
+                {
+                    MessageBox.Show("Please select the KVCOMSVC executable first.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                string directory = Path.GetDirectoryName(exePath);
+                string settingsFilePath = Path.Combine(directory, "KVCOMSVC_SETTING");
+
+                if (File.Exists(settingsFilePath))
+                {
+                    string[] settings = File.ReadAllLines(settingsFilePath);
+                    if (settings.Length > 1)
+                    {
+                        settings[1] = $"/checkinterval:{newValue}"; // Update the second line
+                    }
+                    else
+                    {
+                        Array.Resize(ref settings, 2);
+                        settings[1] = $"/checkinterval:{newValue}";
+                    }
+                    File.WriteAllLines(settingsFilePath, settings);
+                    MessageBox.Show("Settings updated successfully.", "Settings Updated", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else
+                {
+                    MessageBox.Show("KVCOMSVC_SETTING file not found.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to update settings: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
