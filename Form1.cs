@@ -3,6 +3,8 @@ using System.Diagnostics;
 using System.Security.Principal;
 using System.Windows.Forms;
 using Microsoft.Win32;
+using IWshRuntimeLibrary;
+using File = System.IO.File;
 
 namespace KVCOMSVCINSTALLER
 {
@@ -15,14 +17,15 @@ namespace KVCOMSVCINSTALLER
 
         private void Form1_Load(object sender, EventArgs e)
         {
+            /*
             if (!IsAdministrator())
             {
                 PromptForAdminRights();
                 return;
             }
-
-            CheckIfInstalled();
-            LoadSettings();
+            */
+            //CheckIfInstalled();
+            //LoadSettings();
         }
 
         private void button1_Click(object sender, EventArgs e)
@@ -84,6 +87,10 @@ namespace KVCOMSVCINSTALLER
         private void button6_Click(object sender, EventArgs e)
         {
             WriteToSettingsFileLine2(textBox3.Text);
+        }
+        private void button7_Click(object sender, EventArgs e)
+        {
+            BrowseServerApp();
         }
 
         private void InstallExecute(string exePath)
@@ -149,6 +156,30 @@ namespace KVCOMSVCINSTALLER
                     textBox1.Text = openFileDialog.FileName;
                 }
             }
+        }
+
+        private void BrowseServerApp()
+        {
+            using (OpenFileDialog openFileDialog = new OpenFileDialog())
+            {
+                openFileDialog.Filter = "Executable Files (*.exe)|*.exe|All Files (*.*)|*.*";
+                openFileDialog.Title = "Select KVCOMSERVER Executable";
+                if (openFileDialog.ShowDialog() == DialogResult.OK)
+                {
+                    textBox2.Text = AddSlashToPath(openFileDialog.FileName);
+                }
+            }
+        }
+
+        private string AddSlashToPath(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                return path;
+            }
+
+            // Replace each single backslash with a double backslash
+            return path.Replace("\\", "\\\\");
         }
 
         private void CheckIfInstalled()
@@ -332,5 +363,6 @@ namespace KVCOMSVCINSTALLER
                 Application.Exit();
             }
         }
+
     }
 }
